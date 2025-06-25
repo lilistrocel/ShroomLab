@@ -1,0 +1,205 @@
+version: '3.8'
+
+services:
+  # API Gateway - Main FastAPI service
+  api-gateway:
+    build: ./services/api-gateway
+    container_name: shroomlab-api-gateway
+    ports:
+      - "8000:8000"
+    environment:
+      - DATABASE_URL=mysql+pymysql://shroomlab:shroomlab123@mysql:3306/shroomlab
+      - REDIS_URL=redis://redis:6379
+      - INFLUXDB_URL=http://influxdb:8086
+      - INFLUXDB_TOKEN=shroomlab-token
+      - INFLUXDB_ORG=shroomlab
+      - INFLUXDB_BUCKET=sensors
+    depends_on:
+      - mysql
+      - redis
+      - influxdb
+    volumes:
+      - ./services/api-gateway:/app
+    networks:
+      - shroomlab-network
+
+  # IoT Service - Handles sensor data and device communications
+  iot-service:
+    build: ./services/iot-service
+    container_name: shroomlab-iot-service
+    ports:
+      - "8001:8001"
+    environment:
+      - INFLUXDB_URL=http://influxdb:8086
+      - INFLUXDB_TOKEN=shroomlab-token
+      - INFLUXDB_ORG=shroomlab
+      - INFLUXDB_BUCKET=sensors
+      - REDIS_URL=redis://redis:6379
+      - MQTT_BROKER=mqtt-broker:1883
+    depends_on:
+      - influxdb
+      - redis
+      - mqtt-broker
+    volumes:
+      - ./services/iot-service:/app
+    networks:
+      - shroomlab-network
+
+  # Business Service - Handles HR, Finance, Production Management
+  business-service:
+    build: ./services/business-service
+    container_name: shroomlab-business-service
+    ports:
+      - "8002:8002"
+    environment:
+      - DATABASE_URL=mysql+pymysql://shroomlab:shroomlab123@mysql:3306/shroomlab
+      - REDIS_URL=redis://redis:6379
+    depends_on:
+      - mysql
+      - redis
+    volumes:
+      - ./services/business-service:/app
+    networks:
+      - shroomlab-network
+
+  # Analytics Service - Handles reports, dashboards, and data analysis
+  analytics-service:
+    build: ./services/analytics-service
+    container_name: shroomlab-analytics-service
+    ports:
+      - "8003:8003"
+    environment:
+      - DATABASE_URL=mysql+pymysql://shroomlab:shroomlab123@mysql:3306/shroomlab
+      - INFLUXDB_URL=http://influxdb:8086
+      - INFLUXDB_TOKEN=shroomlab-token
+      - INFLUXDB_ORG=shroomlab
+      - INFLUXDB_BUCKET=sensors
+      - REDIS_URL=redis://redis:6379
+    depends_on:
+      - mysql
+      - influxdb
+      - redis
+    volumes:
+      - ./services/analytics-service:/app
+    networks:
+      - shroomlab-network
+
+  # Frontend - React/Next.js web interface
+  frontend:
+    build: ./frontend
+    container_name: shroomlab-frontend
+    ports:
+      - "3000:3000"
+    environment:
+      - NEXT_PUBLIC_API_URL=http://localhost:8000
+      - NEXT_PUBLIC_WS_URL=ws://localhost:8000
+    depends_on:
+      - api-gateway
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+    networks:
+      - shroomlab-network
+
+  # MySQL Database - Primary relational database
+  mysql:
+    image: mysql:8.0
+    container_name: shroomlab-mysql
+    environment:
+      - MYSQL_ROOT_PASSWORD=rootpassword123
+      - MYSQL_DATABASE=shroomlab
+      - MYSQL_USER=shroomlab
+      - MYSQL_PASSWORD=shroomlab123
+    ports:
+      - "3306:3306"
+    volumes:
+      - mysql_data:/var/lib/mysql
+      - ./database/mysql/init:/docker-entrypoint-initdb.d
+    networks:
+      - shroomlab-network
+
+  # InfluxDB - Time-series database for sensor data
+  influxdb:
+    image: influxdb:2.7
+    container_name: shroomlab-influxdb
+    ports:
+      - "8086:8086"
+    environment:
+      - DOCKER_INFLUXDB_INIT_MODE=setup
+      - DOCKER_INFLUXDB_INIT_USERNAME=admin
+      - DOCKER_INFLUXDB_INIT_PASSWORD=password123
+      - DOCKER_INFLUXDB_INIT_ORG=shroomlab
+      - DOCKER_INFLUXDB_INIT_BUCKET=sensors
+      - DOCKER_INFLUXDB_INIT_ADMIN_TOKEN=shroomlab-token
+    volumes:
+      - influxdb_data:/var/lib/influxdb2
+    networks:
+      - shroomlab-network
+
+  # Redis - Caching and session management
+  redis:
+    image: redis:7-alpine
+    container_name: shroomlab-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    networks:
+      - shroomlab-network
+
+  # MQTT Broker - For IoT device communications
+  mqtt-broker:
+    image: eclipse-mosquitto:2
+    container_name: shroomlab-mqtt
+    ports:
+      - "1883:1883"
+      - "9001:9001"
+    volumes:
+      - ./config/mosquitto:/mosquitto/config
+      - mqtt_data:/mosquitto/data
+    networks:
+      - shroomlab-network
+
+  # Celery Worker - Background task processing
+  celery-worker:
+    build: ./services/api-gateway
+    container_name: shroomlab-celery-worker
+    command: celery -A app.celery worker --loglevel=info
+    environment:
+      - DATABASE_URL=mysql+pymysql://shroomlab:shroomlab123@mysql:3306/shroomlab
+      - REDIS_URL=redis://redis:6379
+      - INFLUXDB_URL=http://influxdb:8086
+      - INFLUXDB_TOKEN=shroomlab-token
+    depends_on:
+      - mysql
+      - redis
+      - influxdb
+    volumes:
+      - ./services/api-gateway:/app
+    networks:
+      - shroomlab-network
+
+  # Nginx - Reverse proxy and load balancer
+  nginx:
+    image: nginx:alpine
+    container_name: shroomlab-nginx
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./config/nginx:/etc/nginx/conf.d
+    depends_on:
+      - frontend
+      - api-gateway
+    networks:
+      - shroomlab-network
+
+volumes:
+  mysql_data:
+  influxdb_data:
+  redis_data:
+  mqtt_data:
+
+networks:
+  shroomlab-network:
+    driver: bridge 
