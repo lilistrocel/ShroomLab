@@ -1,326 +1,486 @@
 # ShroomLab IoT Architecture - Phase 2
 
 ## Overview
-Modular IoT system for mushroom farm management using ESP32 and Raspberry Pi 4B devices.
+This document outlines the IoT architecture for ShroomLab's mushroom farm monitoring and control system, specifically designed for the confirmed sensor inventory and hardware platforms.
 
 ## Hardware Platforms
+- **ESP32 Microcontrollers**: Primary sensor nodes and relay controllers
+- **Raspberry Pi 4B (Raspbian OS)**: Advanced processing nodes and IP camera hubs
 
-### ESP32 Microcontrollers
-- **Use Cases**: Sensors, simple controls, battery-powered devices
-- **Advantages**: Low power, Wi-Fi/Bluetooth, cost-effective
-- **Typical Applications**:
-  - Temperature/humidity sensors
-  - Soil moisture sensors
-  - Light sensors
-  - Simple relay controls
+## Confirmed IoT Device Inventory
 
-### Raspberry Pi 4B (Raspbian)
-- **Use Cases**: Complex controls, data processing, camera systems
-- **Advantages**: Full Linux OS, multiple I/O options, processing power
-- **Typical Applications**:
-  - Environmental control systems
-  - Camera monitoring
-  - Complex automation logic
-  - Local data processing/edge computing
+### Environment Sensors
+| Sensor Type | Purpose | Data Type | Units | Frequency |
+|-------------|---------|-----------|-------|-----------|
+| **Relative Humidity** | Moisture level monitoring | Float | % RH | 30s |
+| **Temperature** | Ambient temperature | Float | °C | 30s |
+| **Light Sensor** | PAR/Ambient light levels | Float | lux/µmol | 60s |
+| **CO2 Sensor** | Air quality monitoring | Integer | ppm | 60s |
+| **Air Pollution** | Air quality (PM2.5/PM10) | Float | µg/m³ | 300s |
+| **Noise Sensor** | Sound level monitoring | Float | dB | 60s |
+| **Airflow Sensor** | Ventilation monitoring | Float | m/s | 30s |
+| **Weight Sensor** | Harvest/growth monitoring | Float | kg | 300s |
+| **Liquid Flow** | Irrigation monitoring | Float | L/min | 60s |
 
-## Device Categories
+### Visual Monitoring
+- **IP Camera**: Real-time visual monitoring and time-lapse recording
 
-### 1. Sensors 📊
-**Environmental Monitoring Devices**
-
-#### Sensor Types:
-- **Temperature Sensors** (DS18B20, DHT22)
-- **Humidity Sensors** (DHT22, SHT30)
-- **CO2 Sensors** (MH-Z19, SCD30)
-- **pH Sensors** (Atlas Scientific pH probe)
-- **Light Sensors** (BH1750, TSL2561)
-- **Soil Moisture** (Capacitive sensors)
-- **Air Quality** (BME680)
-- **Water Level** (Ultrasonic, float switches)
-
-#### Data Flow:
-```
-Sensor → ESP32/RPi → MQTT → IoT Service → InfluxDB
-                          ↓
-                     WebSocket → Frontend Dashboard
-```
-
-### 2. Controls 🎛️
-**Automated System Controllers**
-
-#### Control Types:
-- **Irrigation Systems** (pumps, valves, timers)
-- **Ventilation** (fans, air circulation)
-- **Lighting** (LED strips, grow lights)
-- **Heating/Cooling** (heaters, coolers, thermostats)
-- **Misting Systems** (humidity control)
-- **Air Filtration** (HEPA filters, UV sterilization)
-
-#### Control Flow:
-```
-Dashboard/Schedule → API Gateway → IoT Service → MQTT → ESP32/RPi → Actuator
-                                                     ↓
-                               Status Feedback → InfluxDB
-```
+### Control Systems
+- **Relay Modules**: Automated control for irrigation, fans, lights, heaters, etc.
 
 ## MQTT Topic Structure
 
-### Sensor Topics (Publishing)
+### Sensor Data Topics
 ```
-sensors/{farm_id}/{device_id}/{sensor_type}/data
-sensors/{farm_id}/{device_id}/status
-sensors/{farm_id}/{device_id}/heartbeat
-```
-
-**Examples:**
-```
-sensors/farm1/esp32_001/temperature/data
-sensors/farm1/esp32_001/humidity/data
-sensors/farm1/rpi_001/co2/data
-sensors/farm1/esp32_002/status
+sensors/{farm_id}/{device_id}/humidity/data
+sensors/{farm_id}/{device_id}/temperature/data
+sensors/{farm_id}/{device_id}/light/data
+sensors/{farm_id}/{device_id}/co2/data
+sensors/{farm_id}/{device_id}/pollution/data
+sensors/{farm_id}/{device_id}/noise/data
+sensors/{farm_id}/{device_id}/airflow/data
+sensors/{farm_id}/{device_id}/weight/data
+sensors/{farm_id}/{device_id}/liquidflow/data
 ```
 
-### Control Topics (Commands & Status)
+### Control Topics
 ```
-controls/{farm_id}/{device_id}/command
-controls/{farm_id}/{device_id}/status
-controls/{farm_id}/{device_id}/feedback
+controls/{farm_id}/{device_id}/relay/{relay_number}/command
+controls/{farm_id}/{device_id}/relay/{relay_number}/status
 ```
 
-**Examples:**
+### Camera Topics
 ```
-controls/farm1/rpi_irrigation_001/command
-controls/farm1/esp32_relay_001/status
-controls/farm1/rpi_hvac_001/feedback
+camera/{farm_id}/{camera_id}/stream/status
+camera/{farm_id}/{camera_id}/snapshot/request
+camera/{farm_id}/{camera_id}/recording/command
 ```
 
 ### System Topics
 ```
 system/{farm_id}/alerts
-system/{farm_id}/maintenance
-system/global/broadcast
+system/{farm_id}/device/{device_id}/status
+system/{farm_id}/device/{device_id}/heartbeat
 ```
 
-## Device Registration & Management
+## Data Models
 
-### Device Registration Process
-1. **Physical Setup**: Connect device to network
-2. **Auto-Discovery**: Device broadcasts discovery message
-3. **Registration**: Device registers with ShroomLab system
-4. **Configuration**: System assigns farm, location, and parameters
-5. **Activation**: Device begins normal operation
-
-### Device Metadata
+### Sensor Reading Format
 ```json
 {
-  "device_id": "esp32_temp_001",
-  "device_type": "sensor",
-  "hardware": "ESP32",
-  "farm_id": 1,
-  "location": "Growing Room A",
-  "sensor_types": ["temperature", "humidity"],
-  "firmware_version": "1.2.3",
-  "last_seen": "2024-12-25T10:30:00Z",
-  "status": "online",
-  "battery_level": 85
-}
-```
-
-## Data Payloads
-
-### Sensor Data Payload
-```json
-{
-  "device_id": "esp32_temp_001",
-  "timestamp": "2024-12-25T10:30:15Z",
-  "farm_id": 1,
-  "location": "Room A",
-  "readings": {
-    "temperature": {
-      "value": 22.5,
-      "unit": "°C"
-    },
-    "humidity": {
-      "value": 65.3,
-      "unit": "%"
-    }
-  },
-  "battery": 87,
-  "signal_strength": -45
-}
-```
-
-### Control Command Payload
-```json
-{
-  "command_id": "cmd_001",
-  "device_id": "rpi_irrigation_001",
+  "device_id": "ESP32_001",
+  "farm_id": "farm_01",
+  "sensor_type": "humidity",
+  "value": 65.5,
+  "unit": "%RH",
   "timestamp": "2024-12-25T10:30:00Z",
-  "action": "start_irrigation",
-  "parameters": {
-    "duration": 300,
-    "zone": "A1",
-    "flow_rate": 2.5
-  },
-  "priority": "normal"
+  "location": "growing_room_1",
+  "calibration_offset": 0.0,
+  "quality_score": 1.0
 }
 ```
 
-### Control Status Payload
+### Relay Control Format
 ```json
 {
-  "device_id": "rpi_irrigation_001",
-  "timestamp": "2024-12-25T10:30:20Z",
-  "status": "running",
-  "current_action": "irrigation",
-  "parameters": {
-    "zone": "A1",
-    "remaining_time": 285,
-    "flow_rate": 2.5
-  },
-  "system_health": "good"
+  "device_id": "ESP32_002",
+  "farm_id": "farm_01",
+  "relay_number": 1,
+  "command": "ON",
+  "duration": 300,
+  "scheduled_time": "2024-12-25T10:35:00Z",
+  "priority": "manual"
 }
 ```
 
-## API Endpoints
-
-### Sensor Management
-```
-GET    /api/v1/devices/sensors              # List all sensors
-POST   /api/v1/devices/sensors              # Register new sensor
-GET    /api/v1/devices/sensors/{device_id}  # Get sensor details
-PUT    /api/v1/devices/sensors/{device_id}  # Update sensor config
-DELETE /api/v1/devices/sensors/{device_id}  # Remove sensor
-
-GET    /api/v1/sensors/data/{device_id}     # Get sensor data
-GET    /api/v1/sensors/data/farm/{farm_id}  # Get farm sensor data
+### Camera Event Format
+```json
+{
+  "camera_id": "RPI_CAM_001",
+  "farm_id": "farm_01",
+  "event_type": "motion_detected",
+  "timestamp": "2024-12-25T10:30:00Z",
+  "snapshot_url": "/snapshots/farm_01/2024-12-25_10-30-00.jpg",
+  "confidence": 0.85
+}
 ```
 
-### Control Management
-```
-GET    /api/v1/devices/controls              # List all controls
-POST   /api/v1/devices/controls              # Register new control
-GET    /api/v1/devices/controls/{device_id}  # Get control details
-PUT    /api/v1/devices/controls/{device_id}  # Update control config
-DELETE /api/v1/devices/controls/{device_id}  # Remove control
+## Device Integration Examples
 
-POST   /api/v1/controls/command/{device_id}  # Send command
-GET    /api/v1/controls/status/{device_id}   # Get status
-GET    /api/v1/controls/schedule/{device_id} # Get schedule
-POST   /api/v1/controls/schedule/{device_id} # Set schedule
-```
-
-## Security Considerations
-
-### MQTT Security
-- **Authentication**: Username/password for device connections
-- **Authorization**: Topic-based access control
-- **Encryption**: TLS/SSL for MQTT connections
-- **Certificate Management**: Device certificates for authentication
-
-### Device Security
-- **Firmware Updates**: OTA (Over-The-Air) updates
-- **Access Control**: Role-based device permissions
-- **Network Security**: WPA2/WPA3 Wi-Fi encryption
-- **Data Validation**: Input sanitization and validation
-
-## Implementation Phases
-
-### Phase 2.1: Sensor Infrastructure
-1. Design sensor registration API
-2. Implement MQTT sensor data ingestion
-3. Create InfluxDB time-series storage
-4. Build real-time dashboard updates
-
-### Phase 2.2: Control Infrastructure
-1. Design control command API
-2. Implement MQTT control messaging
-3. Create scheduling system
-4. Build control status monitoring
-
-### Phase 2.3: Device Management
-1. Device discovery and registration
-2. Health monitoring and alerts
-3. Firmware update system
-4. Device configuration management
-
-## Example Device Code
-
-### ESP32 Sensor Example (Arduino)
+### ESP32 Sensor Node Code
 ```cpp
 #include <WiFi.h>
 #include <PubSubClient.h>
 #include <DHT.h>
 #include <ArduinoJson.h>
 
-// Device configuration
-const char* DEVICE_ID = "esp32_temp_001";
-const char* FARM_ID = "farm1";
-const char* MQTT_TOPIC = "sensors/farm1/esp32_temp_001/data";
+// Sensor pins and types
+#define DHT_PIN 4
+#define DHT_TYPE DHT22
+#define LIGHT_PIN A0
+#define CO2_PIN A1
+#define NOISE_PIN A2
+#define AIRFLOW_PIN A3
 
-// Initialize sensor and MQTT
-DHT dht(2, DHT22);
+DHT dht(DHT_PIN, DHT_TYPE);
+
+// WiFi and MQTT configuration
+const char* ssid = "YOUR_WIFI_SSID";
+const char* password = "YOUR_WIFI_PASSWORD";
+const char* mqtt_server = "192.168.1.100";  // ShroomLab server IP
+const int mqtt_port = 1883;
+
 WiFiClient espClient;
 PubSubClient client(espClient);
 
-void sendSensorData() {
+String device_id = "ESP32_001";
+String farm_id = "farm_01";
+
+void setup() {
+  Serial.begin(115200);
+  dht.begin();
+  
+  // Connect to WiFi
+  WiFi.begin(ssid, password);
+  while (WiFi.status() != WL_CONNECTED) {
+    delay(500);
+    Serial.print(".");
+  }
+  
+  // Connect to MQTT
+  client.setServer(mqtt_server, mqtt_port);
+  client.setCallback(onMqttMessage);
+}
+
+void loop() {
+  if (!client.connected()) {
+    reconnectMqtt();
+  }
+  client.loop();
+  
+  // Read sensors every 30 seconds
+  static unsigned long lastSensorRead = 0;
+  if (millis() - lastSensorRead > 30000) {
+    readAndPublishSensors();
+    lastSensorRead = millis();
+  }
+  
+  delay(100);
+}
+
+void readAndPublishSensors() {
+  // Read humidity and temperature
+  float humidity = dht.readHumidity();
+  float temperature = dht.readTemperature();
+  
+  if (!isnan(humidity)) {
+    publishSensorData("humidity", humidity, "%RH");
+  }
+  
+  if (!isnan(temperature)) {
+    publishSensorData("temperature", temperature, "°C");
+  }
+  
+  // Read light sensor
+  int lightRaw = analogRead(LIGHT_PIN);
+  float lightLux = map(lightRaw, 0, 4095, 0, 100000); // Convert to lux
+  publishSensorData("light", lightLux, "lux");
+  
+  // Read CO2 (example for MQ-135 or similar)
+  int co2Raw = analogRead(CO2_PIN);
+  float co2ppm = map(co2Raw, 0, 4095, 300, 5000); // Convert to ppm
+  publishSensorData("co2", co2ppm, "ppm");
+  
+  // Read noise level
+  int noiseRaw = analogRead(NOISE_PIN);
+  float noiseDb = map(noiseRaw, 0, 4095, 30, 120); // Convert to dB
+  publishSensorData("noise", noiseDb, "dB");
+  
+  // Read airflow
+  int airflowRaw = analogRead(AIRFLOW_PIN);
+  float airflowMs = map(airflowRaw, 0, 4095, 0, 10); // Convert to m/s
+  publishSensorData("airflow", airflowMs, "m/s");
+}
+
+void publishSensorData(String sensorType, float value, String unit) {
   StaticJsonDocument<200> doc;
-  doc["device_id"] = DEVICE_ID;
-  doc["timestamp"] = getTimestamp();
-  doc["farm_id"] = FARM_ID;
+  doc["device_id"] = device_id;
+  doc["farm_id"] = farm_id;
+  doc["sensor_type"] = sensorType;
+  doc["value"] = value;
+  doc["unit"] = unit;
+  doc["timestamp"] = WiFi.getTime();
+  doc["location"] = "growing_room_1";
+  doc["quality_score"] = 1.0;
   
-  JsonObject readings = doc.createNestedObject("readings");
-  readings["temperature"]["value"] = dht.readTemperature();
-  readings["temperature"]["unit"] = "°C";
-  readings["humidity"]["value"] = dht.readHumidity();
-  readings["humidity"]["unit"] = "%";
+  String jsonString;
+  serializeJson(doc, jsonString);
   
-  char buffer[256];
-  serializeJson(doc, buffer);
-  client.publish(MQTT_TOPIC, buffer);
+  String topic = "sensors/" + farm_id + "/" + device_id + "/" + sensorType + "/data";
+  client.publish(topic.c_str(), jsonString.c_str());
+  
+  Serial.println("Published: " + topic + " -> " + jsonString);
+}
+
+void onMqttMessage(char* topic, byte* payload, unsigned int length) {
+  String message = "";
+  for (int i = 0; i < length; i++) {
+    message += (char)payload[i];
+  }
+  
+  Serial.println("Received: " + String(topic) + " -> " + message);
+  
+  // Handle relay commands
+  if (String(topic).indexOf("/relay/") > 0) {
+    handleRelayCommand(message);
+  }
+}
+
+void reconnectMqtt() {
+  while (!client.connected()) {
+    if (client.connect(device_id.c_str())) {
+      // Subscribe to control topics
+      String relayTopic = "controls/" + farm_id + "/" + device_id + "/relay/+/command";
+      client.subscribe(relayTopic.c_str());
+    } else {
+      delay(5000);
+    }
+  }
 }
 ```
 
-### Raspberry Pi Control Example (Python)
+### Raspberry Pi Camera Integration
 ```python
+#!/usr/bin/env python3
+import cv2
 import paho.mqtt.client as mqtt
 import json
 import time
-import RPi.GPIO as GPIO
+from datetime import datetime
+import base64
+import io
+from PIL import Image
 
-DEVICE_ID = "rpi_irrigation_001"
-FARM_ID = "farm1"
-MQTT_BROKER = "shroomlab-mqtt"
-COMMAND_TOPIC = f"controls/{FARM_ID}/{DEVICE_ID}/command"
-STATUS_TOPIC = f"controls/{FARM_ID}/{DEVICE_ID}/status"
-
-class IrrigationController:
-    def __init__(self):
-        self.client = mqtt.Client()
-        self.client.on_message = self.on_message
-        self.client.connect(MQTT_BROKER, 1883, 60)
-        self.client.subscribe(COMMAND_TOPIC)
+class CameraModule:
+    def __init__(self, camera_id="RPI_CAM_001", farm_id="farm_01"):
+        self.camera_id = camera_id
+        self.farm_id = farm_id
+        self.cap = cv2.VideoCapture(0)  # USB camera or Pi camera
+        
+        # MQTT setup
+        self.mqtt_client = mqtt.Client()
+        self.mqtt_client.on_connect = self.on_connect
+        self.mqtt_client.on_message = self.on_message
+        self.mqtt_client.connect("192.168.1.100", 1883, 60)  # ShroomLab server
+        
+        self.recording = False
+        
+    def on_connect(self, client, userdata, flags, rc):
+        print(f"Camera {self.camera_id} connected to MQTT")
+        # Subscribe to camera commands
+        command_topic = f"camera/{self.farm_id}/{self.camera_id}/+/command"
+        client.subscribe(command_topic)
         
     def on_message(self, client, userdata, msg):
-        command = json.loads(msg.payload.decode())
-        if command['action'] == 'start_irrigation':
-            self.start_irrigation(command['parameters'])
-        elif command['action'] == 'stop_irrigation':
-            self.stop_irrigation()
-            
-    def start_irrigation(self, params):
-        # Control irrigation valve
-        GPIO.output(18, GPIO.HIGH)
-        self.send_status("running", params)
+        topic_parts = msg.topic.split('/')
+        command_type = topic_parts[-2]  # snapshot, recording, etc.
+        command = msg.payload.decode()
         
-    def send_status(self, status, params=None):
-        payload = {
-            "device_id": DEVICE_ID,
-            "timestamp": int(time.time()),
-            "status": status,
-            "parameters": params or {}
+        if command_type == "snapshot":
+            self.take_snapshot()
+        elif command_type == "recording":
+            if command == "START":
+                self.start_recording()
+            elif command == "STOP":
+                self.stop_recording()
+                
+    def take_snapshot(self):
+        ret, frame = self.cap.read()
+        if ret:
+            timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+            filename = f"/snapshots/{self.farm_id}/{timestamp}.jpg"
+            cv2.imwrite(filename, frame)
+            
+            # Publish snapshot event
+            event_data = {
+                "camera_id": self.camera_id,
+                "farm_id": self.farm_id,
+                "event_type": "snapshot_taken",
+                "timestamp": datetime.now().isoformat(),
+                "snapshot_url": filename,
+                "resolution": f"{frame.shape[1]}x{frame.shape[0]}"
+            }
+            
+            topic = f"camera/{self.farm_id}/{self.camera_id}/snapshot/status"
+            self.mqtt_client.publish(topic, json.dumps(event_data))
+            
+    def start_recording(self):
+        self.recording = True
+        timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+        self.video_filename = f"/recordings/{self.farm_id}/{timestamp}.mp4"
+        
+        # Video writer setup
+        fourcc = cv2.VideoWriter_fourcc(*'mp4v')
+        self.video_writer = cv2.VideoWriter(self.video_filename, fourcc, 20.0, (640, 480))
+        
+        print(f"Started recording: {self.video_filename}")
+        
+    def stop_recording(self):
+        self.recording = False
+        if hasattr(self, 'video_writer'):
+            self.video_writer.release()
+            
+        # Publish recording event
+        event_data = {
+            "camera_id": self.camera_id,
+            "farm_id": self.farm_id,
+            "event_type": "recording_completed",
+            "timestamp": datetime.now().isoformat(),
+            "video_url": self.video_filename
         }
-        self.client.publish(STATUS_TOPIC, json.dumps(payload))
+        
+        topic = f"camera/{self.farm_id}/{self.camera_id}/recording/status"
+        self.mqtt_client.publish(topic, json.dumps(event_data))
+        
+    def run(self):
+        while True:
+            self.mqtt_client.loop_start()
+            
+            ret, frame = self.cap.read()
+            if ret:
+                # Process frame for motion detection, etc.
+                if self.recording and hasattr(self, 'video_writer'):
+                    self.video_writer.write(frame)
+                    
+                # Send periodic heartbeat
+                heartbeat = {
+                    "camera_id": self.camera_id,
+                    "farm_id": self.farm_id,
+                    "status": "online",
+                    "timestamp": datetime.now().isoformat()
+                }
+                
+                topic = f"system/{self.farm_id}/device/{self.camera_id}/heartbeat"
+                self.mqtt_client.publish(topic, json.dumps(heartbeat))
+                
+            time.sleep(0.1)
+
+if __name__ == "__main__":
+    camera = CameraModule()
+    camera.run()
 ```
+
+## Database Schema Updates
+
+### Sensor Types Table
+```sql
+CREATE TABLE sensor_types (
+    id INT PRIMARY KEY AUTO_INCREMENT,
+    type_name VARCHAR(50) UNIQUE NOT NULL,
+    unit VARCHAR(20) NOT NULL,
+    min_value DECIMAL(10,3),
+    max_value DECIMAL(10,3),
+    optimal_min DECIMAL(10,3),
+    optimal_max DECIMAL(10,3),
+    reading_frequency INT DEFAULT 30,
+    description TEXT
+);
+
+-- Insert sensor types
+INSERT INTO sensor_types (type_name, unit, min_value, max_value, optimal_min, optimal_max, reading_frequency) VALUES
+('humidity', '%RH', 0, 100, 55, 75, 30),
+('temperature', '°C', -40, 85, 18, 24, 30),
+('light', 'lux', 0, 100000, 200, 800, 60),
+('co2', 'ppm', 300, 5000, 400, 1000, 60),
+('pollution', 'µg/m³', 0, 500, 0, 35, 300),
+('noise', 'dB', 0, 120, 0, 50, 60),
+('airflow', 'm/s', 0, 20, 0.1, 2.0, 30),
+('weight', 'kg', 0, 1000, NULL, NULL, 300),
+('liquidflow', 'L/min', 0, 100, NULL, NULL, 60);
+```
+
+### Device Types Table
+```sql
+CREATE TABLE device_types (
+    id INT PRIMARY KEY AUTO_INCREMENT,
+    type_name VARCHAR(50) UNIQUE NOT NULL,
+    category ENUM('sensor', 'control', 'camera') NOT NULL,
+    description TEXT,
+    supported_sensors TEXT -- JSON array of sensor types
+);
+
+INSERT INTO device_types (type_name, category, supported_sensors) VALUES
+('ESP32_Multi_Sensor', 'sensor', '["humidity", "temperature", "light", "co2", "noise", "airflow"]'),
+('ESP32_Relay_Controller', 'control', '[]'),
+('Load_Cell_Scale', 'sensor', '["weight"]'),
+('Flow_Meter', 'sensor', '["liquidflow"]'),
+('Air_Quality_Monitor', 'sensor', '["pollution"]'),
+('IP_Camera', 'camera', '[]');
+```
+
+## API Endpoints for IoT Integration
+
+### Sensor Data Endpoints
+- `POST /api/v1/sensors/data` - Bulk sensor data ingestion
+- `GET /api/v1/sensors/{farm_id}/latest` - Latest readings by farm
+- `GET /api/v1/sensors/{farm_id}/{sensor_type}` - Historical data
+- `POST /api/v1/sensors/calibrate/{device_id}` - Calibration settings
+
+### Device Management Endpoints  
+- `POST /api/v1/devices/register` - Register new device
+- `GET /api/v1/devices/{farm_id}` - List farm devices
+- `PUT /api/v1/devices/{device_id}/status` - Update device status
+- `POST /api/v1/devices/{device_id}/command` - Send control commands
+
+### Camera Endpoints
+- `GET /api/v1/cameras/{farm_id}/stream` - Live stream access
+- `POST /api/v1/cameras/{camera_id}/snapshot` - Request snapshot
+- `GET /api/v1/cameras/{farm_id}/recordings` - List recordings
+- `POST /api/v1/cameras/{camera_id}/recording/start` - Start recording
+
+### Relay Control Endpoints
+- `POST /api/v1/controls/relay/{device_id}/{relay_number}` - Control relay
+- `GET /api/v1/controls/{farm_id}/status` - Get all control statuses
+- `POST /api/v1/controls/schedule` - Schedule automated actions
+
+## Implementation Priority
+
+### Phase 2.1: Core Sensors (Week 1)
+1. ✅ Temperature & Humidity (DHT22/SHT30)
+2. ✅ Light sensor integration
+3. ✅ Basic MQTT communication
+4. ✅ Database storage setup
+
+### Phase 2.2: Advanced Sensors (Week 2)  
+1. ⏳ CO2 sensor integration
+2. ⏳ Air quality/pollution monitoring
+3. ⏳ Noise level monitoring
+4. ⏳ Airflow sensor setup
+
+### Phase 2.3: Specialized Sensors (Week 3)
+1. ⏳ Weight sensor/load cell integration
+2. ⏳ Liquid flow sensor setup
+3. ⏳ Sensor calibration system
+4. ⏳ Data validation and quality checks
+
+### Phase 2.4: Control & Visual (Week 4)
+1. ⏳ Relay control implementation
+2. ⏳ IP camera integration
+3. ⏳ Real-time dashboard updates
+4. ⏳ Mobile-responsive interface
+
+## Security Considerations
+- MQTT authentication and encryption
+- Device certificate management
+- Network segmentation for IoT devices
+- Regular security updates for ESP32/Pi firmware
+- Camera stream encryption and access control
+
+## Monitoring & Maintenance
+- Device heartbeat monitoring
+- Sensor drift detection and alerts
+- Automatic calibration reminders
+- Battery level monitoring (for wireless sensors)
+- Network connectivity monitoring
 
 This architecture provides a robust, scalable foundation for your ESP32 and Raspberry Pi devices in the mushroom farm IoT ecosystem! 
