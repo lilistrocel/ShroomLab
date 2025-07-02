@@ -13,7 +13,7 @@ CREATE TABLE IF NOT EXISTS users (
     email VARCHAR(100) UNIQUE NOT NULL,
     hashed_password VARCHAR(255) NOT NULL,
     full_name VARCHAR(100) NOT NULL,
-    role ENUM('admin', 'manager', 'operator', 'viewer') DEFAULT 'viewer',
+    role ENUM('ADMIN', 'MANAGER', 'OPERATOR', 'VIEWER') DEFAULT 'VIEWER',
     is_active BOOLEAN DEFAULT TRUE,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
@@ -119,7 +119,12 @@ CREATE TABLE IF NOT EXISTS alerts (
 
 -- Insert default admin user (password: admin123)
 INSERT INTO users (username, email, hashed_password, full_name, role) VALUES 
-('admin', 'admin@shroomlab.com', '$2b$12$LQv3c1yqBWVHxkd0LHAkCOYz6TtxMQJqhN8/LewdKuJP4HwHT5qza', 'System Administrator', 'admin')
+('admin', 'admin@shroomlab.com', '$2b$12$LQv3c1yqBWVHxkd0LHAkCOYz6TtxMQJqhN8/LewdKuJP4HwHT5qza', 'System Administrator', 'ADMIN')
+ON DUPLICATE KEY UPDATE username = username;
+
+-- Insert superadmin user (password: superadmin123)
+INSERT INTO users (username, email, hashed_password, full_name, role) VALUES 
+('superadmin', 'superadmin@shroomlab.com', '$2b$12$wFX9UdjX25ueBIu4CuCpi.PzEsvv5vva3.2B3PLC0bl7HPTBUHqyK', 'Super Administrator', 'ADMIN')
 ON DUPLICATE KEY UPDATE username = username;
 
 -- Insert sample farm

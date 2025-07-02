@@ -1,15 +1,32 @@
 import { useState, useEffect } from 'react';
+import { useRouter } from 'next/router';
 
 export default function Home() {
   const [apiStatus, setApiStatus] = useState('Checking...');
+  const router = useRouter();
 
   useEffect(() => {
+    // Check if user is already logged in
+    const token = localStorage.getItem('access_token');
+    if (token) {
+      router.push('/dashboard');
+      return;
+    }
+
     // Check API Gateway health
     fetch('http://localhost:8000/health')
       .then(res => res.json())
       .then(data => setApiStatus('Connected ✅'))
       .catch(() => setApiStatus('Disconnected ❌'));
   }, []);
+
+  const handleLoginRedirect = () => {
+    router.push('/login');
+  };
+
+  const handleDashboardRedirect = () => {
+    router.push('/dashboard');
+  };
 
   return (
     <div style={{ padding: '20px', fontFamily: 'Arial, sans-serif' }}>
@@ -40,6 +57,38 @@ export default function Home() {
           <li>✅ Business Operations</li>
           <li>✅ Analytics & Reporting</li>
         </ul>
+        
+        <div style={{ marginTop: '20px' }}>
+          <button 
+            onClick={handleLoginRedirect}
+            style={{
+              backgroundColor: '#059669',
+              color: 'white',
+              padding: '12px 24px',
+              border: 'none',
+              borderRadius: '8px',
+              fontSize: '16px',
+              cursor: 'pointer',
+              marginRight: '10px'
+            }}
+          >
+            Go to Login
+          </button>
+          <button 
+            onClick={handleDashboardRedirect}
+            style={{
+              backgroundColor: '#2563eb',
+              color: 'white',
+              padding: '12px 24px',
+              border: 'none',
+              borderRadius: '8px',
+              fontSize: '16px',
+              cursor: 'pointer'
+            }}
+          >
+            Go to Dashboard
+          </button>
+        </div>
       </div>
 
       <div style={{ 
@@ -52,7 +101,8 @@ export default function Home() {
         <ul>
           <li><a href="http://localhost:8000/docs" target="_blank">API Documentation</a></li>
           <li><a href="http://localhost:8086" target="_blank">InfluxDB UI</a></li>
-          <li><strong>Default Login:</strong> admin / admin123</li>
+          <li><strong>Admin:</strong> admin / admin123</li>
+          <li><strong>Super Admin:</strong> superadmin / superadmin123</li>
         </ul>
       </div>
 
